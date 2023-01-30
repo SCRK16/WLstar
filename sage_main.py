@@ -52,6 +52,37 @@ def HKC(wfa, model, membership_queries, verbose=False):
 	if verbose:
 		print("No counterxample found")
 	return None
+
+def handle_counterexample(wfa, cex, S, E, transitions, membership_table, membership_queries, GCDs, verbose=False):
+	suff = [e for e in suffixes(cex) if e not in E]
+	for s in reversed(S):
+		gcdo = GCDs[s]
+		GCDs[s] = reduce(gcd, (GCDs[s+a] for a in wfa.alphabet if s+a in GCDs), GCDs[s])
+		if verbose and gcdo != GCDs[s]:
+			print("Changed GCD for", s, "from", gcdo, "to", GCDs[s])
+		for e in suff:
+			if s+e not in membership_queries:
+				membership_queries[s+e] = wfa.member(s+e)
+		gcds = reduce(gcd, (membership_queries[s+e] for e in suff), GCDs[s])
+		if gcds != gcdo:
+			gcdo = gcds
+			if verbose:
+				print("New gcd for '", s, "'", GCDs[s], gcds)
+			GCDs[s] = gcds
+			for e in E:
+				membership_table[s][e] = membership_queries[s+e] // GCDs[s]
+		for e in suff:
+			membership_table[s][e] = membership_queries[s+e] // GCDs[s]
+		#Below: Special case for if suff is empty (which happens when we made a bad assumption about the GCDS)
+		if gcdo != GCDs[s]:
+			for e in E:
+				se = s+e
+				membership_table[s][e] = membership_queries[se] // GCDs[s]
+	for s in S:
+		gcds = GCDs[s[:-1]] if s[:-1] in GCDs and s[:-1] != s else 1 #Need check s[:-1] != s because ""[:-1] == ""
+		transitions[s] = GCDs[s] // gcds
+	E.extend(suff)
+	return E, transitions, membership_table, membership_queries, GCDs
 	
 def check_table_closed(wfa, S, E, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found, check_closed=closed_by_gap, verbose=False):
 	closed = False
@@ -69,9 +100,8 @@ def check_table_closed(wfa, S, E, transitions, membership_queries, membership_ta
 			else:
 				#print("Finding linear combination for", t)
 				for e in E:
-					te = t+e
-					if te not in membership_queries:
-						membership_queries[te] = wfa.member(te)
+					if t+e not in membership_queries:
+						membership_queries[t+e] = wfa.member(t+e)
 				gcdt = GCDs[t[:-1]] if GCDs[t[:-1]] else 1 #Default to 1 if GCD is 0
 				txE = [membership_queries[t+e] // gcdt for e in E]
 				SxE = [[membership_table[s][e] for e in E] for s in S]
@@ -80,16 +110,13 @@ def check_table_closed(wfa, S, E, transitions, membership_queries, membership_ta
 					closed = False
 					cex_found = False
 					GCDt = reduce(gcd, (membership_queries[t+e] for e in E))
-					#Should also update for all prefixes of t
 					if GCDt % GCDs[t[:-1]] != 0:
-						new_gcd = gcd(GCDt, GCDs[t[:-1]])
-						if verbose:
-							print("Updating GCD for", t[:-1], "from", GCDs[t[:-1]], "to", new_gcd)
-						GCDs[t[:-1]] = new_gcd
+						# Our assumption for the GCD of t[:-1] was wrong. This yields a counterexample, which we handle (which updates the GCD) 
 						for e in E:
-							membership_table[t[:-1]][e] = membership_queries[t[:-1]+e] // new_gcd
-						gcds = GCDs[t[:-2]] if t[:-2] in GCDs and t[:-2] != t[:-1] else 1
-						transitions[t[:-1]] = GCDs[t[:-1]] // gcds
+							if t+e not in membership_queries:
+								membership_queries[t+e] = wfa.member(t+e)
+							if membership_queries[t+e] % GCDs[t[:-1]] != 0:
+								E, transitions, membership_table, membership_queries, GCDs = handle_counterexample(wfa, t+e, S, E, transitions, membership_table, membership_queries, GCDs, verbose=verbose)
 					else:
 						S.append(t)
 						GCDs[t] = GCDt
@@ -101,7 +128,10 @@ def check_table_closed(wfa, S, E, transitions, membership_queries, membership_ta
 				else:
 					lin_com[t] = list(c)
 	return lin_com, S, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found
-	
+
+
+
+
 def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample=HKC, verbose=False, count=False):
 	"""
 	Learns wfa using Lstar for weighted automata
@@ -169,41 +199,15 @@ def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample
 			elif verbose:
 				print("Found counterexample after removing states:", cex)
 		cex_found = True
-		suff = [e for e in suffixes(cex) if e not in E]
-		for s in reversed(S):
-			gcdo = GCDs[s]
-			GCDs[s] = reduce(gcd, (GCDs[s+a] for a in wfa.alphabet if s+a in GCDs), GCDs[s])
-			if verbose and gcdo != GCDs[s]:
-				print("Changed GCD for", s, "from", gcdo, "to", GCDs[s])
-			for e in suff:
-				if s+e not in membership_queries:
-					membership_queries[s+e] = wfa.member(s+e)
-			gcds = reduce(gcd, (membership_queries[s+e] for e in suff), GCDs[s])
-			if gcds != gcdo:
-				gcdo = gcds
-				if verbose:
-					print("New gcd for '", s, "'", GCDs[s], gcds)
-				GCDs[s] = gcds
-				for e in E:
-					membership_table[s][e] = membership_queries[s+e] // GCDs[s]
-			for e in suff:
-				membership_table[s][e] = membership_queries[s+e] // GCDs[s]
-			#Below: Special case for if suff is empty (which happens when we made a bad assumption about the GCDS)
-			if gcdo != GCDs[s]:
-				for e in E:
-					se = s+e
-					membership_table[s][e] = membership_queries[se] // GCDs[s]
-		for s in S:
-			gcds = GCDs[s[:-1]] if s[:-1] in GCDs and s[:-1] != s else 1 #Need check s[:-1] != s because ""[:-1] == ""
-			transitions[s] = GCDs[s] // gcds
-		E.extend(suff)
+		E, transitions, membership_table, membership_queries, GCDs = handle_counterexample(wfa, cex, S, E, transitions, membership_table, membership_queries, GCDs, verbose=verbose)
 
 if __name__ == "__main__":
 	#aut = random_automaton(alphabet=['a', 'b'], min_states=2, max_states=2, pos_weights=list(range(-5, 5)), min_transitions=2)
 	#aut = load_automaton("Examples/benchmark/Automata/abc10_65.txt")
-	aut = load_automaton("Examples/benchmark/Automata/a6_91.txt")
+	#aut = load_automaton("Examples/benchmark/Automata/a3_21.txt")
 	#aut = load_automaton("Examples/benchmark/Automata/ab4_18.txt")
+	aut = load_automaton("Examples/benchmark/Automata/abc3_57.txt")
 	print(aut)
-	res, membership_count, closed_count, equivalence_count, closed_after_counterexample = minimal_weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=False, count=True)
+	res, membership_count, closed_count, equivalence_count, closed_after_counterexample = minimal_weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=True, count=True)
 	#res = weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=True)
 	compare_machines(aut, res, prover=HKC)
