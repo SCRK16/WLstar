@@ -2,6 +2,7 @@ from collections import defaultdict, deque
 from sage.interfaces.gap import *
 from math import gcd
 from functools import reduce
+from time import process_time
 
 from weighted_automaton import *
 from WLstar import *
@@ -13,11 +14,7 @@ def closed_by_gap(wfa, S, E, t, membership_queries, SxE=None, txE=None, verbose=
 	if txE is None:
 		txE = [membership_queries[t+e] for e in E]
 	input = "SolutionIntMat(" + str(SxE) + ", " + str(txE) + ")"
-	#if verbose:
-	#	print(input)
 	result = gap(input)
-	#if verbose:
-	#	print(result)
 	if str(result) == "fail":
 		if verbose:
 			print("GAP: Fail, len S/len E:", len(S), len(E), "t:", t)
@@ -129,9 +126,6 @@ def check_table_closed(wfa, S, E, transitions, membership_queries, membership_ta
 					lin_com[t] = list(c)
 	return lin_com, S, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found
 
-
-
-
 def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample=HKC, verbose=False, count=False):
 	"""
 	Learns wfa using Lstar for weighted automata
@@ -153,6 +147,7 @@ def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample
 	equivalence_count = 0
 	cex_found = False
 	closed_after_counterexample = 0
+	total_teacher_time = 0
 	while True:
 		lin_com, S, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found = check_table_closed(wfa, S, E, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found, verbose=verbose)
 		if cex_found and count:
@@ -161,7 +156,10 @@ def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample
 		membership_count = len(membership_queries)
 		equivalence_count += 1
 		# Finding counterexample
+		teacher_start = process_time()
 		cex = check_counterexample(wfa, model, membership_queries)
+		teacher_stop = process_time()
+		total_teacher_time += teacher_stop - teacher_start
 		if verbose:
 			print("Counterexample:", cex)
 			if cex is not None:
@@ -185,7 +183,10 @@ def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample
 			lin_com, S, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found = check_table_closed(wfa, S, E, transitions, membership_queries, membership_table, GCDs, closed_count, cex_found, verbose=verbose)
 			model = create_machine(wfa.alphabet, S, (membership_table[s][""] for s in S), lin_com)
 			membership_count = len(membership_queries)
+			teacher_start = process_time()
 			cex = check_counterexample(wfa, model, membership_queries)
+			teacher_stop = process_time()
+			total_teacher_time += teacher_stop - teacher_start
 			if cex is None:
 				if verbose:
 					print("S:", S, "E:", E)
@@ -194,7 +195,7 @@ def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample
 					for t in (s + a for s in S for a in wfa.alphabet if s + a not in S):
 						print(t, [membership_queries[t+e] for e in E])
 				if count:
-					return model, membership_count, closed_count, equivalence_count, closed_after_counterexample
+					return model, membership_count, closed_count, equivalence_count, closed_after_counterexample, total_teacher_time
 				return model
 			elif verbose:
 				print("Found counterexample after removing states:", cex)
@@ -203,11 +204,8 @@ def minimal_weighted_Lstar(wfa, check_closed=closed_by_gap, check_counterexample
 
 if __name__ == "__main__":
 	#aut = random_automaton(alphabet=['a', 'b'], min_states=2, max_states=2, pos_weights=list(range(-5, 5)), min_transitions=2)
-	#aut = load_automaton("Examples/benchmark/Automata/abc10_65.txt")
-	#aut = load_automaton("Examples/benchmark/Automata/a3_21.txt")
-	#aut = load_automaton("Examples/benchmark/Automata/ab4_18.txt")
-	aut = load_automaton("Examples/benchmark/Automata/abc3_57.txt")
+	aut = load_automaton("Examples/35m.txt")
 	print(aut)
-	res, membership_count, closed_count, equivalence_count, closed_after_counterexample = minimal_weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=True, count=True)
-	#res = weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=True)
+	#res, membership_count, closed_count, equivalence_count, closed_after_counterexample = minimal_weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=True, count=True)
+	res = weighted_Lstar(aut, check_closed=closed_by_gap, check_counterexample=HKC, verbose=True)
 	compare_machines(aut, res, prover=HKC)

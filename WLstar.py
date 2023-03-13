@@ -1,5 +1,6 @@
 from collections import defaultdict
 import random
+from time import process_time
 
 from weighted_automaton import *
 
@@ -82,6 +83,7 @@ def weighted_Lstar(wfa, check_closed=closed_by_hand, check_counterexample=counte
 	equivalence_count = 0
 	cex_found = False
 	closed_after_counterexample = 0
+	total_teacher_time = 0
 	while True:
 		closed = False
 		while not closed:
@@ -94,7 +96,7 @@ def weighted_Lstar(wfa, check_closed=closed_by_hand, check_counterexample=counte
 			SA = list(s + a for s in S for a in wfa.alphabet)
 			lin_com = defaultdict(list)
 			closed_count += 1
-			for t in SA:
+			for t in SA: #Check if the table is closed
 				if t in S: #Check if t is in S: cases of the form 0 0 ... 0 1 0 ... 0 0
 					i = S.index(t)
 					lin_com[t] = list(1 if j == i else 0 for j in range(0, len(S)))
@@ -116,11 +118,15 @@ def weighted_Lstar(wfa, check_closed=closed_by_hand, check_counterexample=counte
 		if cex_found and count:
 				closed_after_counterexample += 1
 		model = create_machine(wfa.alphabet, S, (wfa.member(s) for s in S), lin_com)
+		print(model)
 		membership_count = len(membership_queries)
 		equivalence_count += 1
 		if verbose:
 			print("Finding counterexample")
+		teacher_start = process_time()
 		cex = check_counterexample(wfa, model, membership_queries)
+		teacher_stop = process_time()
+		total_teacher_time += teacher_stop - teacher_start
 		if verbose:
 			print("Counterexample:", cex)
 		if cex is None:
@@ -132,7 +138,7 @@ def weighted_Lstar(wfa, check_closed=closed_by_hand, check_counterexample=counte
 					print("Number of equivalence queries:", equivalence_count)
 					print("Number of times the table was closed after finding a counterexample:", closed_after_counterexample)
 			if count:
-				return model, membership_count, closed_count, equivalence_count, closed_after_counterexample
+				return model, membership_count, closed_count, equivalence_count, closed_after_counterexample, total_teacher_time
 			return model
 		cex_found = True
 		E.extend(e for e in suffixes(cex) if e not in E)

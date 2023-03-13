@@ -1,13 +1,14 @@
 from weighted_automaton import *
 from WLstar import random_counterexample
-from sage_main import closed_by_gap, minimal_weighted_Lstar
+from sage_main import closed_by_gap, minimal_weighted_Lstar, HKC
 
 from time import perf_counter, process_time
 
 if __name__ == "__main__":
-	method = "GapRandom"
+	method = "GapHKC"
 	closed = closed_by_gap
-	counterexample = random_counterexample
+	#counterexample = random_counterexample
+	counterexample = HKC
 
 	progress_name = "Examples/benchmark/Results" + method + "Minimal/progress.txt"
 	with open(progress_name, "r") as progress_file:
@@ -21,21 +22,22 @@ if __name__ == "__main__":
 		print("aplh", alph)
 		for nstates in range(progress[1] if alph == progress[0] else 1, 11):
 			print("nstates", nstates)
-			for i in range(progress[2] if nstates == progress[1] else 1, 101):
+			for i in range(progress[2] if alph == progress[0] and nstates == progress[1] else 1, 101):
 				print("i", i)
 				aut_file = "Examples/benchmark/Automata/" + "".join(alph) + str(nstates) + "_" + str(i) + ".txt"
 				aut = load_automaton(filename=aut_file)
 				start_time = process_time()
 				start_perf = perf_counter()
-				result = minimal_weighted_Lstar(aut, count=True)
+				result = minimal_weighted_Lstar(aut, check_closed=closed, check_counterexample=counterexample, count=True)
 				stop_time = process_time()
 				stop_perf = perf_counter()
 				total_time = stop_time - start_time
 				total_perf = stop_perf - start_perf
 				result_name = "Examples/benchmark/Results" + method + "Minimal/" + "".join(alph) + str(nstates) + "_" + str(i) + ".txt"
+				result_str = str(total_perf) + "\n" + str(total_time) + "\n" + str(len(result[0].weights)) + "\n" 
+				result_str += str(result[1]) + "\n" + str(result[2]) + "\n" + str(result[3]) + "\n" + str(result[4])
+				result_str += "\n" + str(float(result[5]))
 				with open(result_name, "w") as result_file:
-					result_str = str(total_perf) + "\n" + str(total_time) + "\n" + str(len(result[0].weights)) + "\n" 
-					result_str += str(result[1]) + "\n" + str(result[2]) + "\n" + str(result[3]) + "\n" + str(result[4])
 					result_file.write(str(result_str))
 				result_aut_name = "Examples/benchmark/Results" + method + "Minimal/" + "".join(alph) + str(nstates) + "_" + str(i) + "A.txt"
 				with open(result_aut_name, "w") as result_aut_file:

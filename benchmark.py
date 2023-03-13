@@ -6,9 +6,9 @@ from sage_main import *
 from time import perf_counter, process_time
 
 if __name__ == "__main__":
-	method = "GapRandom"
+	method = "GapHKC"
 	closed = closed_by_gap
-	counterexample = random_counterexample
+	counterexample = HKC
 
 	progress_name = "Examples/benchmark/Results" + method + "/progress.txt"
 	with open(progress_name, "r") as progress_file:
@@ -22,7 +22,7 @@ if __name__ == "__main__":
 		print("aplh", alph)
 		for nstates in range(progress[1] if alph == progress[0] else 1, 11):
 			print("nstates", nstates)
-			for i in range(progress[2] if nstates == progress[1] else 1, 101):
+			for i in range(progress[2] if alph == progress[0] and nstates == progress[1] else 1, 101):
 				print("i", i)
 				aut_file = "Examples/benchmark/Automata/" + "".join(alph) + str(nstates) + "_" + str(i) + ".txt"
 				aut = load_automaton(filename=aut_file)
@@ -37,6 +37,7 @@ if __name__ == "__main__":
 				with open(result_name, "w") as result_file:
 					result_str = str(total_perf) + "\n" + str(total_time) + "\n" + str(len(result[0].weights)) + "\n" 
 					result_str += str(result[1]) + "\n" + str(result[2]) + "\n" + str(result[3]) + "\n" + str(result[4])
+					result_str += "\n"+ str(result[5])
 					result_file.write(str(result_str))
 				result_aut_name = "Examples/benchmark/Results" + method + "/" + "".join(alph) + str(nstates) + "_" + str(i) + "A.txt"
 				with open(result_aut_name, "w") as result_aut_file:
