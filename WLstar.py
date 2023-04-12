@@ -118,7 +118,6 @@ def weighted_Lstar(wfa, check_closed=closed_by_hand, check_counterexample=counte
 		if cex_found and count:
 				closed_after_counterexample += 1
 		model = create_machine(wfa.alphabet, S, (wfa.member(s) for s in S), lin_com)
-		print(model)
 		membership_count = len(membership_queries)
 		equivalence_count += 1
 		if verbose:

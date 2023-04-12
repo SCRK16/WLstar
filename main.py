@@ -23,7 +23,7 @@ def closed_by_z3(wfa, S, E, t, membership_queries, SxE=None, txE=None, verbose=F
 
 if __name__ == "__main__": #load("Examples/13o.txt")
 	#aut = random_automaton(alphabet=['a', 'b'], min_states=5, max_states=5, pos_weights=list(range(1, 5)), min_transitions=5) 
-	aut = load_automaton("Examples/benchmark/Automata/a4_92.txt")
+	aut = load_automaton("Examples/38o.txt")
 	print(aut)
 	res = weighted_Lstar(aut, check_closed=closed_by_z3, check_counterexample=random_counterexample, verbose=False, count=True)
-	compare_machines(aut, res, prover=random_counterexample)
+	compare_machines(aut, res[0], prover=random_counterexample)
